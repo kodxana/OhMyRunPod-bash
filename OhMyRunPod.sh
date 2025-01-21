@@ -300,6 +300,22 @@ draw_menu_item() {
     fi
 }
 
+# Function to handle zero GPU case
+handle_zero_gpu() {
+    echo "Setting up simple HTTP server for zero GPU mode..."
+    
+    # Kill any running jupyter-lab processes
+    pkill jupyter-lab || true
+    
+    # Kill any existing HTTP server on port 8888
+    pkill -f "python3 -m http.server 8888" || true
+    
+    # Start simple HTTP server in /workspace in background with all output redirected
+    cd /workspace
+    nohup python3 -m http.server 8888 > /dev/null 2>&1 &
+    cd - > /dev/null
+}
+
 # Main menu function
 show_menu() {
     setup_terminal
@@ -317,8 +333,8 @@ show_menu() {
         local COLS=$(tput cols)
         
         # Menu dimensions
-        local menu_width=44
-        local menu_height=10
+        local menu_width=60
+        local menu_height=12
         local menu_top=$(( (LINES-menu_height)/2 ))
         local menu_left=$(( (COLS-menu_width)/2 ))
         
@@ -333,12 +349,20 @@ show_menu() {
         tput cup $((menu_top+1)) $menu_left
         printf "Welcome to your RunPod interface!\n"
         
+        # Zero GPU warning if applicable
+        if [ "${RUNPOD_GPU_COUNT:-1}" = "0" ]; then
+            tput cup $((menu_top+2)) $menu_left
+            printf "${YELLOW}⚠️  Running in Zero GPU mode (512MB RAM)${NORMAL}\n"
+            tput cup $((menu_top+3)) $menu_left
+            printf "${YELLOW}📂 File server running on port 8888${NORMAL}\n"
+        fi
+        
         # Separator
-        tput cup $((menu_top+2)) $menu_left
+        tput cup $((menu_top+4)) $menu_left
         printf "──────────────────────\n"
         
         # Menu items
-        local current_line=$((menu_top+3))
+        local current_line=$((menu_top+5))
         for i in "${!items[@]}"; do
             tput cup $current_line $menu_left
             if [ $i -eq $selected ]; then
@@ -378,4 +402,7 @@ show_menu() {
 }
 
 # Start the application
+if [ "${RUNPOD_GPU_COUNT:-1}" = "0" ]; then
+    handle_zero_gpu
+fi
 show_menu
